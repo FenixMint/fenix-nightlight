@@ -42,6 +42,38 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(state.phase, "morning-transition")
         self.assertEqual(state.temperature, 4250)
 
+    def test_discrete_backend_switches_at_sunrise(self):
+        before = target_state(
+            datetime(2026, 10, 4, 6, 59, tzinfo=self.tz),
+            self.settings,
+            self.solar,
+            smooth=False,
+        )
+        after = target_state(
+            datetime(2026, 10, 4, 7, 0, tzinfo=self.tz),
+            self.settings,
+            self.solar,
+            smooth=False,
+        )
+        self.assertEqual((before.temperature, before.phase), (4000, "night"))
+        self.assertEqual((after.temperature, after.phase), (4500, "day"))
+
+    def test_discrete_backend_switches_at_sunset(self):
+        before = target_state(
+            datetime(2026, 10, 4, 17, 59, tzinfo=self.tz),
+            self.settings,
+            self.solar,
+            smooth=False,
+        )
+        after = target_state(
+            datetime(2026, 10, 4, 18, 0, tzinfo=self.tz),
+            self.settings,
+            self.solar,
+            smooth=False,
+        )
+        self.assertEqual((before.temperature, before.phase), (4500, "day"))
+        self.assertEqual((after.temperature, after.phase), (4000, "night"))
+
 
 if __name__ == "__main__":
     unittest.main()

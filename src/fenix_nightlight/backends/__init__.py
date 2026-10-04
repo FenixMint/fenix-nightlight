@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import Backend, BackendError
+from .base import Backend, BackendCapabilities, BackendError
 from .cosmic import CosmicBackend
 from ..config import Settings
 
@@ -16,7 +16,7 @@ def get_backend(settings: Settings) -> Backend:
         raise BackendError("no supported color-temperature backend is available")
 
     for backend in candidates:
-        if backend.name == requested:
+        if backend.matches(requested):
             if not backend.available():
                 raise BackendError(f"requested backend '{requested}' is not available")
             return backend
@@ -24,4 +24,4 @@ def get_backend(settings: Settings) -> Backend:
     raise BackendError(f"unknown backend: {settings.backend}")
 
 
-__all__ = ["Backend", "BackendError", "get_backend"]
+__all__ = ["Backend", "BackendCapabilities", "BackendError", "get_backend"]

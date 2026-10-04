@@ -22,18 +22,26 @@ def _settings_or_help():
         raise SystemExit(2)
 
 
-def _current(settings) -> tuple[datetime, object, TargetState]:
+def _current(settings, backend) -> tuple[datetime, object, TargetState]:
     tz = ZoneInfo(settings.timezone)
     now = datetime.now(tz)
     solar = solar_times(now.date(), settings.latitude, settings.longitude, settings.timezone)
-    return now, solar, target_state(now, settings, solar)
+    state = target_state(
+        now,
+        settings,
+        solar,
+        smooth=backend.capabilities.smooth_transitions,
+    )
+    return now, solar, state
 
 
-def _apply(settings, state: TargetState, announce: bool = True) -> None:
-    backend = get_backend(settings)
+def _apply(settings, backend, state: TargetState, announce: bool = True) -> None:
     backend.apply(state.temperature, settings.brightness)
     if announce:
-        print(f"Applied {state.temperature} K @ {settings.brightness:.0%} ({state.phase}, backend={backend.name})")
+        print(
+            f"Applied {state.temperature} K @ {settings.brightness:.0%} "
+            f"({state.phase}, backend={backend.name})"
+        )
 
 
 def cmd_setup(_args) -> int:
@@ -45,8 +53,9 @@ def cmd_setup(_args) -> int:
 
 def cmd_status(_args) -> int:
     settings = _settings_or_help()
-    now, solar, state = _current(settings)
     backend = get_backend(settings)
+    now, solar, state = _current(settings, backend)
+
     print("Fenix Night Light")
     print(f"Location: {settings.location_name}")
     print("Location source: user configured / local only")
@@ -57,15 +66,18 @@ def cmd_status(_args) -> int:
     print(f"Phase: {state.phase}")
     print(f"Target: {state.temperature} K")
     print(f"Day / night: {settings.day_temp} K / {settings.night_temp} K")
-    print(f"Transition: {settings.transition_minutes} min")
     print(f"Backend: {backend.name}")
+    print("Transition mode: " + ("smooth" if backend.capabilities.smooth_transitions else "discrete"))
+    print("Requires privilege: " + ("yes" if backend.capabilities.requires_privilege else "no"))
+    print("May flicker: " + ("yes" if backend.capabilities.may_flicker else "no"))
     return 0
 
 
 def cmd_apply(_args) -> int:
     settings = _settings_or_help()
-    _now, _solar, state = _current(settings)
-    _apply(settings, state)
+    backend = get_backend(settings)
+    _now, _solar, state = _current(settings, backend)
+    _apply(settings, backend, state)
     return 0
 
 
@@ -76,7 +88,7 @@ def cmd_test(args) -> int:
         raise SystemExit("temperature must be between 1000 and 10000 K")
     backend = get_backend(settings)
     backend.apply(temperature, settings.brightness)
-    print(f"Applied test value: {temperature} K")
+    print(f"Applied test value: {temperature} K via {backend.name}")
     return 0
 
 
@@ -90,9 +102,16 @@ def cmd_off(_args) -> int:
 
 def cmd_transition(_args) -> int:
     settings = _settings_or_help()
+    backend = get_backend(settings)
+
+    if not backend.capabilities.smooth_transitions:
+        _now, _solar, state = _current(settings, backend)
+        _apply(settings, backend, state)
+        return 0
+
     while True:
-        _now, _solar, state = _current(settings)
-        _apply(settings, state)
+        _now, _solar, state = _current(settings, backend)
+        _apply(settings, backend, state)
         if state.phase not in {"morning-transition", "evening-transition"}:
             return 0
         time.sleep(settings.transition_step_minutes * 60)
@@ -108,8 +127,10 @@ def cmd_schedule(_args) -> int:
 
 def cmd_bootstrap(_args) -> int:
     settings = _settings_or_help()
-    _now, _solar, state = _current(settings)
-    _apply(settings, state)
+    backend = get_backend(settings)
+    _now, _solar, state = _current(settings, backend)
+    _apply(settings, backend, state)
+
     try:
         events = schedule_systemd_user_events(settings)
         for event in events:
@@ -117,7 +138,10 @@ def cmd_bootstrap(_args) -> int:
     except RuntimeError as exc:
         print(f"Scheduler unavailable: {exc}", file=sys.stderr)
 
-    if state.phase in {"morning-transition", "evening-transition"}:
+    if backend.capabilities.smooth_transitions and state.phase in {
+        "morning-transition",
+        "evening-transition",
+    }:
         return cmd_transition(_args)
     return 0
 
@@ -135,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="show solar times and current target").set_defaults(func=cmd_status)
     sub.add_parser("apply", help="apply the correct temperature for the current time").set_defaults(func=cmd_apply)
     sub.add_parser("off", help="ask the active backend to disable correction").set_defaults(func=cmd_off)
-    sub.add_parser("transition", help="continue a smooth active sunrise/sunset transition").set_defaults(func=cmd_transition)
+    sub.add_parser("transition", help="apply the backend-appropriate solar transition").set_defaults(func=cmd_transition)
     sub.add_parser("schedule", help="schedule the next sunrise and sunset with systemd --user").set_defaults(func=cmd_schedule)
     sub.add_parser("bootstrap", help="apply current state and schedule upcoming events").set_defaults(func=cmd_bootstrap)
 
