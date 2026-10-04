@@ -4,7 +4,7 @@
 
 It is being developed as a component of the upcoming **FX Linux** system, while remaining an independent project that can be used on other Linux distributions and desktop environments.
 
-> Status: **0.1 alpha** — usable for testing, API and integration details may still change.
+> Status: **0.2 development** — architecture is under active refinement. Fedora COSMIC deployment is intentionally deferred until the COSMIC backend is mature enough for safe daily use.
 
 ## Design goals
 
@@ -32,19 +32,20 @@ There is **no default city or coordinate**. On first setup the user enters a loc
 
 ## Current backend
 
-### COSMIC
+### COSMIC DRM fallback
 
-Version 0.1 supports COSMIC through:
+Current COSMIC support uses the external `cosmic-nightlight-helper` as a DRM/KMS fallback.
 
-```text
-cosmic-nightlight-helper
-```
+Important limitations discovered during Fedora COSMIC validation:
 
-The backend is detected automatically when the helper is available.
+- the helper requires elevated privileges,
+- it may briefly flicker while acquiring DRM master,
+- therefore the backend is classified as **discrete**, not smooth,
+- Fenix Night Light will apply only the day/night boundary change on this backend rather than stepping every few minutes.
 
-Additional backends are planned.
+The backend capability model is designed so future COSMIC-native, wlroots, GNOME, KDE, or X11 adapters can expose their own transition behavior without changing solar policy.
 
-When Fenix Night Light owns scheduling, disable the COSMIC Night Light app's own schedule/background automation to avoid two controllers competing for the same display state.
+When Fenix Night Light eventually owns scheduling on a COSMIC workstation, the existing COSMIC Night Light app must not simultaneously control the display.
 
 ## Install from a clone
 
