@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Fenix Night Light solar schedule daily
+
+[Timer]
+OnCalendar=*-*-* 00:05:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

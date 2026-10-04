@@ -1,0 +1,6 @@
+[Unit]
+Description=Refresh Fenix Night Light sunrise/sunset schedule
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/fenix-nightlight schedule
