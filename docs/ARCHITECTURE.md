@@ -9,7 +9,7 @@ The Python core uses only the standard library and owns:
 - XDG-local configuration,
 - solar calculations,
 - day/night policy,
-- smooth transitions,
+- transition policy selected from backend capabilities,
 - CLI behavior,
 - event planning.
 
@@ -19,9 +19,16 @@ It does not depend on Fedora, Debian, openSUSE, Arch or another distribution.
 
 Backends translate a requested color temperature into a desktop/compositor-specific action.
 
-Version 0.1 ships with the `cosmic` backend, using `cosmic-nightlight-helper`.
+Backends expose capabilities in addition to apply/off operations:
 
-Future backends can be added without changing the solar or privacy logic.
+- whether smooth transitions are safe,
+- whether privileged execution is required,
+- whether applying a value may visibly flicker.
+
+The first implementation is `cosmic-drm`, currently using the external `cosmic-nightlight-helper`.
+Because this path requires elevated DRM/KMS access and can visibly flicker, it is a **discrete backend**: sunrise and sunset apply one boundary change rather than a multi-step transition.
+
+Future backends can be added without changing the solar or privacy logic. A native COSMIC backend can later replace `cosmic-drm` automatically once a suitable compositor API exists.
 
 ## Scheduling
 
